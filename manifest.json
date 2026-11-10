@@ -1,0 +1,18 @@
+{
+  "background_color": "#ffffff",
+  "dir": "auto",
+  "display": "standalone",
+  "name": "DroughtWatch Morocco",
+  "orientation": "portrait",
+  "scope": "./",
+  "short_name": "DroughtWatch",
+  "start_url": "./",
+  "theme_color": "#14532d",
+  "description": "Morocco drought and climate monitoring platform",
+  "id": "./",
+  "lang": "ar",
+  "categories": [
+    "education",
+    "weather"
+  ]
+}
