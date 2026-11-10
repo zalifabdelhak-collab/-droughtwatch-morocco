@@ -53,6 +53,9 @@ footer{text-align:center;padding:25px;color:#718578;font-size:12px}
  .charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:15px}
 }
 </style>
+ 
+<link rel="manifest" href="./manifest.json">
+ 
 </head>
 
 <body>
@@ -474,6 +477,17 @@ window.addEventListener("load",()=>{
  },300);
 });
 </script>
+ 
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./pwabuilder-sw.js")
+      .then(reg => console.log("Service Worker registered"))
+      .catch(err => console.error("Service Worker error:", err));
+  });
+}
+</script>
+ 
 </body>
 </html>
 
