@@ -1,0 +1,479 @@
+
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DroughtWatch Morocco</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f1f6f2;color:#183b2b}
+header{
+ background:linear-gradient(120deg,#064e35dd,#15945edd),
+ url("https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1400");
+ background-size:cover;background-position:center;
+ color:white;padding:38px 16px;text-align:center
+}
+header h1{margin:0 0 10px;font-size:29px}
+header p{margin:6px 0;font-size:14px}
+.topbar{display:flex;justify-content:center;gap:10px;margin-top:17px}
+.topbar button{border:1px solid white;background:#ffffff20;color:white;border-radius:20px;padding:8px 18px}
+main{max-width:1100px;margin:auto;padding:15px}
+.section-title{margin:24px 0 13px;font-size:20px;color:#145b3b}
+.info{background:white;border-radius:15px;padding:15px;margin-bottom:15px;box-shadow:0 3px 13px #0000000d}
+.cards{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.metric{background:white;padding:16px;border-radius:14px;box-shadow:0 3px 12px #0000000d;min-height:120px;border-bottom:3px solid #36a66b}
+.metric .symbol{font-size:27px}
+.metric h3{margin:8px 0;font-size:14px;color:#557263}
+.metric strong{font-size:22px;color:#087344}
+.metric small{display:block;margin-top:5px;color:#82958a}
+select,button.refresh{width:100%;padding:13px;border-radius:10px;border:1px solid #cbded1;background:white;font-size:15px;margin:8px 0}
+button.refresh{background:#087344;color:white;border:none;cursor:pointer}
+#map{width:100%;height:430px;min-height:350px;border-radius:14px;background:#e3eee7;border:1px solid #d4e3d9;z-index:1}
+.status{font-size:13px;color:#647b6d;margin:10px 0;line-height:1.7}
+.legend{background:white;padding:12px;border-radius:12px;margin-top:12px;font-size:13px;line-height:2}
+.dot{display:inline-block;width:12px;height:12px;border-radius:50%;margin-left:5px}
+.gallery{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.photo{position:relative;height:150px;border-radius:14px;overflow:hidden;background:#dce9df}
+.photo img{width:100%;height:100%;object-fit:cover;display:block}
+.photo span{position:absolute;bottom:0;right:0;left:0;padding:25px 10px 10px;color:white;font-weight:bold;background:linear-gradient(transparent,#0009)}
+.chart-box{background:white;border-radius:14px;padding:14px;margin-bottom:15px;box-shadow:0 3px 12px #0000000d}
+.chart-box h3{font-size:15px;margin:4px 0 12px;color:#315c46}
+canvas{width:100%;height:230px;display:block}
+.chart-note{font-size:12px;color:#82958a;line-height:1.7}
+.region-summary{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.summary-item{background:#f1f7f2;padding:12px;border-radius:10px;font-size:13px}
+footer{text-align:center;padding:25px;color:#718578;font-size:12px}
+.leaflet-container{font-family:Arial,sans-serif}
+@media(min-width:700px){
+ .cards{grid-template-columns:repeat(4,1fr)}
+ .gallery{grid-template-columns:repeat(4,1fr)}
+ .charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:15px}
+}
+</style>
+</head>
+
+<body>
+<header>
+ <h1>🌍 DroughtWatch Morocco</h1>
+ <p>منصة مراقبة الجفاف والتغيرات المناخية بالمغرب</p>
+ <p>Drought Monitoring Platform</p>
+ <div class="topbar">
+  <button onclick="setLanguage('ar')">العربية</button>
+  <button onclick="setLanguage('en')">EN</button>
+ </div>
+</header>
+
+<main>
+<h2 class="section-title">📊 نظرة عامة على الجهة</h2>
+<div class="info">
+ <label for="regionSelect">اختار الجهة المغربية:</label>
+ <select id="regionSelect">
+  <option value="MA-05">بني ملال خنيفرة</option>
+  <option value="MA-01">طنجة تطوان الحسيمة</option>
+  <option value="MA-02">الشرق</option>
+  <option value="MA-03">فاس مكناس</option>
+  <option value="MA-04">الرباط سلا القنيطرة</option>
+  <option value="MA-06">الدار البيضاء سطات</option>
+  <option value="MA-07">مراكش آسفي</option>
+  <option value="MA-08">درعة تافيلالت</option>
+  <option value="MA-09">سوس ماسة</option>
+  <option value="MA-10">كلميم واد نون</option>
+  <option value="MA-11">العيون الساقية الحمراء</option>
+  <option value="MA-12">الداخلة وادي الذهب</option>
+ </select>
+ <button class="refresh" id="refreshButton">🔄 تحديث البيانات</button>
+ <div id="weatherStatus" class="status">جاهز لتحميل بيانات المناخ</div>
+</div>
+
+<div class="cards">
+ <div class="metric"><div class="symbol">🌡️</div><h3>متوسط الحرارة</h3><strong id="temperature">-- °C</strong><small>NASA POWER</small></div>
+ <div class="metric"><div class="symbol">🌧️</div><h3>التساقطات</h3><strong id="rainfall">-- mm</strong><small>NASA POWER</small></div>
+ <div class="metric"><div class="symbol">💧</div><h3>الرطوبة</h3><strong id="humidity">-- %</strong><small>NASA POWER</small></div>
+ <div class="metric"><div class="symbol">⚠️</div><h3>التقييم الأولي</h3><strong id="risk">--</strong><small>تقييم تجريبي</small></div>
+</div>
+
+<h2 class="section-title">🗺️ خريطة مراقبة الجفاف</h2>
+<div class="info">
+ <div id="map"></div>
+ <div id="mapStatus" class="status">جاري تجهيز الخريطة...</div>
+ <div class="legend">
+  <strong>مفتاح الخريطة:</strong><br>
+  <span class="dot" style="background:#36a66b"></span> خطر منخفض<br>
+  <span class="dot" style="background:#e6c342"></span> خطر متوسط<br>
+  <span class="dot" style="background:#e58b36"></span> خطر مرتفع<br>
+  <span class="dot" style="background:#c83d3d"></span> خطر شديد<br>
+  <span class="dot" style="background:#aab7af"></span> بيانات غير متوفرة
+ </div>
+</div>
+
+<h2 class="section-title">📸 صور المناخ والبيئة</h2>
+<div class="gallery">
+ <div class="photo"><img src="https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=600" alt="الأراضي الزراعية" loading="lazy"><span>🌱 الأراضي الزراعية</span></div>
+ <div class="photo"><img src="https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=600" alt="الجبال" loading="lazy"><span>⛰️ الجبال والطبيعة</span></div>
+ <div class="photo"><img src="https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=600" alt="الطبيعة" loading="lazy"><span>🌍 التغيرات المناخية</span></div>
+ <div class="photo"><img src="https://images.unsplash.com/photo-1433086966358-54859d0ed716?w=600" alt="المياه" loading="lazy"><span>💧 المياه والتساقطات</span></div>
+</div>
+
+<h2 class="section-title">📈 المبيانات المناخية</h2>
+<div class="charts-grid">
+ <div class="chart-box"><h3>🌡️ تطور درجات الحرارة</h3><canvas id="temperatureChart"></canvas><div class="chart-note">تطور الحرارة اليومية خلال الفترة المتاحة من NASA POWER.</div></div>
+ <div class="chart-box"><h3>🌧️ التساقطات اليومية</h3><canvas id="rainChart"></canvas><div class="chart-note">كمية التساقطات اليومية بالميليمتر.</div></div>
+ <div class="chart-box"><h3>💧 تطور الرطوبة</h3><canvas id="humidityChart"></canvas><div class="chart-note">نسبة الرطوبة اليومية خلال الفترة المتاحة.</div></div>
+ <div class="chart-box"><h3>📊 ملخص البيانات المناخية</h3><div id="chartSummary" class="region-summary">
+  <div class="summary-item">متوسط الحرارة: --</div><div class="summary-item">مجموع الأمطار: --</div><div class="summary-item">متوسط الرطوبة: --</div><div class="summary-item">عدد الأيام: --</div>
+ </div></div>
+</div>
+
+<div class="info">
+ <h3>📈 معلومات الجهة</h3>
+ <p id="regionInfo">الجهة: بني ملال خنيفرة</p>
+ <p class="status">البيانات المناخية مصدرها NASA POWER. التقييم المعروض أولي وتجريبي، وليس تصنيفاً رسمياً للجفاف.</p>
+</div>
+</main>
+
+<footer>DroughtWatch Morocco — Professional Beta<br>Climate Monitoring Platform</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+"use strict";
+
+const regions={
+ "MA-01":{name:"طنجة تطوان الحسيمة",lat:35.0,lon:-5.8},
+ "MA-02":{name:"الشرق",lat:34.7,lon:-2.3},
+ "MA-03":{name:"فاس مكناس",lat:34.0,lon:-5.0},
+ "MA-04":{name:"الرباط سلا القنيطرة",lat:34.0,lon:-6.5},
+ "MA-05":{name:"بني ملال خنيفرة",lat:32.3,lon:-6.3},
+ "MA-06":{name:"الدار البيضاء سطات",lat:33.2,lon:-7.5},
+ "MA-07":{name:"مراكش آسفي",lat:31.5,lon:-8.0},
+ "MA-08":{name:"درعة تافيلالت",lat:31.5,lon:-5.5},
+ "MA-09":{name:"سوس ماسة",lat:30.2,lon:-8.5},
+ "MA-10":{name:"كلميم واد نون",lat:28.5,lon:-10.0},
+ "MA-11":{name:"العيون الساقية الحمراء",lat:26.5,lon:-12.8},
+ "MA-12":{name:"الداخلة وادي الذهب",lat:23.7,lon:-15.9}
+};
+
+let map=null;
+let geoLayer=null;
+let markersLayer=null;
+let selectedCode="MA-05";
+let chartData=null;
+let requestNumber=0;
+const regionRisks={};
+const regionMarkers={};
+
+function getRiskColor(risk){
+ if(risk==="منخفض")return "#36a66b";
+ if(risk==="متوسط")return "#e6c342";
+ if(risk==="مرتفع")return "#e58b36";
+ if(risk==="شديد")return "#c83d3d";
+ return "#aab7af";
+}
+
+function updateRegionColors(){
+ if(geoLayer){
+  geoLayer.setStyle(feature=>{
+   const code=feature.properties?.shapeISO;
+   const risk=regionRisks[code];
+   return {
+    color:code===selectedCode?"#123f2b":"#ffffff",
+    weight:code===selectedCode?3:1.5,
+    fillColor:getRiskColor(risk),
+    fillOpacity:risk?0.65:0.28
+   };
+  });
+ }
+ Object.keys(regionMarkers).forEach(code=>{
+  regionMarkers[code].setStyle({
+   color:"#ffffff",
+   fillColor:getRiskColor(regionRisks[code]),
+   weight:2,
+   fillOpacity:1
+  });
+ });
+}
+
+function initMap(){
+ const status=document.getElementById("mapStatus");
+ if(typeof L==="undefined"){
+  status.textContent="لم يتم تحميل مكتبة Leaflet. تحقق من الإنترنت وأعد فتح الصفحة.";
+  return;
+ }
+ try{
+  if(map)return;
+  map=L.map("map",{center:[31.8,-6.2],zoom:5,minZoom:4,maxZoom:12});
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{
+   attribution:"© OpenStreetMap contributors",
+   maxZoom:19
+  }).addTo(map);
+
+  markersLayer=L.layerGroup().addTo(map);
+
+  Object.keys(regions).forEach(code=>{
+   const r=regions[code];
+   const marker=L.circleMarker([r.lat,r.lon],{
+    radius:8,color:"#fff",fillColor:"#aab7af",fillOpacity:1,weight:2
+   }).addTo(markersLayer);
+   regionMarkers[code]=marker;
+   marker.bindPopup(r.name+"<br>خطر الجفاف: بيانات غير متوفرة");
+   marker.on("click",()=>{
+    document.getElementById("regionSelect").value=code;
+    selectRegion(code);
+   });
+  });
+
+  status.textContent="تم إنشاء الخريطة. جاري تحميل حدود الجهات...";
+  setTimeout(()=>map.invalidateSize(true),300);
+  loadGeoJSON();
+ }catch(error){
+  console.error(error);
+  status.textContent="خطأ في إنشاء الخريطة: "+error.message;
+ }
+}
+
+async function loadGeoJSON(){
+ const status=document.getElementById("mapStatus");
+ const sources=[
+  async()=>{
+   const res=await fetch("https://www.geoboundaries.org/api/current/gbOpen/MAR/ADM1/");
+   if(!res.ok)throw new Error("geoBoundaries metadata");
+   const meta=await res.json();
+   const url=meta.simplifiedGeometryGeoJSON||meta.gjDownloadURL;
+   if(!url)throw new Error("GeoJSON URL missing");
+   const dataRes=await fetch(url);
+   if(!dataRes.ok)throw new Error("GeoJSON download");
+   return dataRes.json();
+  },
+  async()=>{
+   const res=await fetch("https://raw.githubusercontent.com/Salah-Zkara/Morocco-GeoJson/master/Morocco-Regions.geojson");
+   if(!res.ok)throw new Error("GitHub GeoJSON");
+   return res.json();
+  }
+ ];
+
+ for(const source of sources){
+  try{
+   const data=await source();
+   if(!data||!Array.isArray(data.features))throw new Error("Invalid GeoJSON");
+   if(geoLayer)map.removeLayer(geoLayer);
+
+   geoLayer=L.geoJSON(data,{
+    style:feature=>{
+     const code=feature.properties?.shapeISO;
+     const risk=regionRisks[code];
+     return {
+      color:code===selectedCode?"#123f2b":"#ffffff",
+      weight:code===selectedCode?3:1.5,
+      fillColor:getRiskColor(risk),
+      fillOpacity:risk?0.65:0.28
+     };
+    },
+    onEachFeature:(feature,layer)=>{
+     const props=feature.properties||{};
+     const code=props.shapeISO;
+     const region=regions[code];
+     if(region){
+      layer.bindTooltip(region.name);
+      layer.on("click",()=>{
+       document.getElementById("regionSelect").value=code;
+       selectRegion(code);
+      });
+     }else if(props.shapeName){
+      layer.bindTooltip(props.shapeName);
+     }
+    }
+   }).addTo(map);
+
+   status.textContent="تم تحميل حدود الجهات المغربية بنجاح.";
+   const bounds=geoLayer.getBounds();
+   if(bounds.isValid())map.fitBounds(bounds,{padding:[10,10]});
+   updateRegionColors();
+   setTimeout(()=>map.invalidateSize(true),500);
+   return;
+  }catch(error){
+   console.warn("GeoJSON source failed:",error);
+  }
+ }
+ status.textContent="الخريطة الأساسية تعمل، لكن تعذر تحميل حدود الجهات. تحقق من الإنترنت.";
+}
+
+async function fetchNASA(region){
+ const now=new Date();
+ const end=new Date(now);
+ end.setDate(end.getDate()-7);
+ const start=new Date(end);
+ start.setDate(start.getDate()-29);
+ const format=date=>date.getFullYear()+String(date.getMonth()+1).padStart(2,"0")+String(date.getDate()).padStart(2,"0");
+
+ const url="https://power.larc.nasa.gov/api/temporal/daily/point?parameters=T2M,PRECTOTCORR,RH2M&community=AG&longitude="+region.lon+"&latitude="+region.lat+"&start="+format(start)+"&end="+format(end)+"&format=JSON";
+ const controller=new AbortController();
+ const timeout=setTimeout(()=>controller.abort(),25000);
+ try{
+  const response=await fetch(url,{signal:controller.signal});
+  if(!response.ok)throw new Error("NASA POWER HTTP "+response.status);
+  const json=await response.json();
+  const p=json.properties.parameter;
+  const temp=p.T2M||{},rain=p.PRECTOTCORR||{},humid=p.RH2M||{};
+  const dates=Object.keys(temp).filter(date=>
+   Number.isFinite(temp[date])&&Number.isFinite(rain[date])&&Number.isFinite(humid[date])&&
+   temp[date]>-900&&rain[date]>-900&&humid[date]>-900
+  ).sort();
+  if(!dates.length)throw new Error("No valid climate data");
+  const temperatures=dates.map(d=>temp[d]);
+  const rainfall=dates.map(d=>rain[d]);
+  const humidity=dates.map(d=>humid[d]);
+  const average=a=>a.reduce((x,y)=>x+y,0)/a.length;
+  return {
+   dates,temperatures,rainfall,humidity,
+   temperature:average(temperatures),
+   rainTotal:rainfall.reduce((a,b)=>a+b,0),
+   humidityAverage:average(humidity)
+  };
+ }finally{
+  clearTimeout(timeout);
+ }
+}
+
+function calculateRisk(data){
+ if(data.rainTotal<10||data.humidityAverage<30)return "شديد";
+ if(data.rainTotal<30||data.humidityAverage<40)return "مرتفع";
+ if(data.rainTotal<60||data.humidityAverage<50)return "متوسط";
+ return "منخفض";
+}
+
+function drawChart(canvasId,labels,values,type){
+ const canvas=document.getElementById(canvasId);
+ if(!canvas||!values.length)return;
+ const rect=canvas.getBoundingClientRect();
+ const width=Math.max(rect.width,280),height=230,dpr=window.devicePixelRatio||1;
+ canvas.width=width*dpr;canvas.height=height*dpr;
+ const ctx=canvas.getContext("2d");
+ ctx.setTransform(dpr,0,0,dpr,0,0);
+ ctx.clearRect(0,0,width,height);
+ const pad={left:38,right:12,top:18,bottom:35};
+ const chartW=width-pad.left-pad.right,chartH=height-pad.top-pad.bottom;
+ const maxValue=Math.max(...values,1)*1.15;
+ const minValue=type==="line"?Math.min(0,...values):0;
+ ctx.font="10px Arial";ctx.fillStyle="#819488";ctx.strokeStyle="#e7eee9";
+ for(let i=0;i<=4;i++){
+  const y=pad.top+chartH*i/4;
+  ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(width-pad.right,y);ctx.stroke();
+  ctx.fillText((maxValue-(maxValue-minValue)*i/4).toFixed(0),3,y+3);
+ }
+ const xAt=i=>pad.left+(labels.length<=1?0:i/(labels.length-1)*chartW);
+ const yAt=v=>pad.top+chartH-((v-minValue)/(maxValue-minValue||1))*chartH;
+ if(type==="bar"){
+  const step=chartW/values.length,barW=Math.max(2,step*.65);
+  values.forEach((v,i)=>{
+   const x=pad.left+i*step+(step-barW)/2,y=yAt(v);
+   ctx.fillStyle="#39a66b";ctx.fillRect(x,y,barW,pad.top+chartH-y);
+  });
+ }else{
+  ctx.beginPath();
+  values.forEach((v,i)=>i===0?ctx.moveTo(xAt(i),yAt(v)):ctx.lineTo(xAt(i),yAt(v)));
+  ctx.strokeStyle="#15945e";ctx.lineWidth=2.5;ctx.stroke();
+  values.forEach((v,i)=>{
+   ctx.beginPath();ctx.arc(xAt(i),yAt(v),2.5,0,Math.PI*2);
+   ctx.fillStyle="#087344";ctx.fill();
+  });
+ }
+ const ticks=[0,Math.floor((labels.length-1)/2),labels.length-1];
+ ctx.fillStyle="#819488";
+ ticks.forEach(i=>{
+  if(labels[i])ctx.fillText(labels[i].slice(4,6)+"/"+labels[i].slice(6,8),xAt(i)-13,height-10);
+ });
+}
+
+function updateCharts(data){
+ chartData=data;
+ drawChart("temperatureChart",data.dates,data.temperatures,"line");
+ drawChart("rainChart",data.dates,data.rainfall,"bar");
+ drawChart("humidityChart",data.dates,data.humidity,"line");
+ document.getElementById("chartSummary").innerHTML=
+  '<div class="summary-item">متوسط الحرارة: <strong>'+data.temperature.toFixed(1)+' °C</strong></div>'+
+  '<div class="summary-item">مجموع الأمطار: <strong>'+data.rainTotal.toFixed(1)+' mm</strong></div>'+
+  '<div class="summary-item">متوسط الرطوبة: <strong>'+data.humidityAverage.toFixed(1)+' %</strong></div>'+
+  '<div class="summary-item">عدد الأيام: <strong>'+data.dates.length+'</strong></div>';
+}
+
+async function loadWeather(){
+ const code=document.getElementById("regionSelect").value;
+ const region=regions[code];
+ const status=document.getElementById("weatherStatus");
+ const button=document.getElementById("refreshButton");
+ const thisRequest=++requestNumber;
+ selectedCode=code;
+ status.textContent="جاري تحميل بيانات NASA POWER...";
+ button.disabled=true;button.textContent="⏳ جاري التحديث...";
+ document.getElementById("regionInfo").textContent="الجهة: "+region.name+" | الرمز: "+code;
+ updateRegionColors();
+
+ try{
+  const data=await fetchNASA(region);
+  if(thisRequest!==requestNumber)return;
+  const risk=calculateRisk(data);
+  regionRisks[code]=risk;
+  document.getElementById("temperature").textContent=data.temperature.toFixed(1)+" °C";
+  document.getElementById("rainfall").textContent=data.rainTotal.toFixed(1)+" mm";
+  document.getElementById("humidity").textContent=data.humidityAverage.toFixed(1)+" %";
+  document.getElementById("risk").textContent=risk;
+  updateCharts(data);
+  updateRegionColors();
+  if(regionMarkers[code]){
+   regionMarkers[code].setPopupContent(region.name+"<br>خطر الجفاف: "+risk);
+  }
+  status.textContent="تم تحديث البيانات بنجاح. الفترة: آخر 30 يوماً المتاحة من NASA POWER.";
+ }catch(error){
+  console.error(error);
+  if(thisRequest===requestNumber){
+   status.textContent="تعذر جلب بيانات NASA POWER. حاول تحديث البيانات لاحقاً.";
+  }
+ }finally{
+  if(thisRequest===requestNumber){
+   button.disabled=false;button.textContent="🔄 تحديث البيانات";
+  }
+ }
+}
+
+function selectRegion(code){
+ selectedCode=code;
+ updateRegionColors();
+ const r=regions[code];
+ if(map)map.setView([r.lat,r.lon],6);
+ loadWeather();
+}
+
+function setLanguage(lang){
+ if(lang==="en"){
+  document.documentElement.lang="en";
+  document.documentElement.dir="ltr";
+  alert("The English version will be expanded in a future update.");
+ }else{
+  document.documentElement.lang="ar";
+  document.documentElement.dir="rtl";
+ }
+}
+
+document.getElementById("regionSelect").addEventListener("change",function(){
+ selectRegion(this.value);
+});
+document.getElementById("refreshButton").addEventListener("click",loadWeather);
+
+window.addEventListener("resize",()=>{
+ if(chartData)updateCharts(chartData);
+ if(map)setTimeout(()=>map.invalidateSize(true),200);
+});
+
+window.addEventListener("load",()=>{
+ setTimeout(()=>{
+  initMap();
+  if(map)setTimeout(()=>map.invalidateSize(true),700);
+  loadWeather();
+ },300);
+});
+</script>
+</body>
+</html>
+
